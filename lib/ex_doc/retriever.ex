@@ -95,6 +95,7 @@ defmodule ExDoc.Retriever do
           not Code.ensure_loaded?(module) ->
             raise Error, "module #{inspect(module)} is not defined/available"
 
+          # TODO: change this
           not function_exported?(module, :__info__, 1) ->
             # Not an Elixir module, ignore until we have Erlang support
             false
@@ -260,13 +261,22 @@ defmodule ExDoc.Retriever do
     specs =
       module_data.specs
       |> Map.get(actual_def, [])
-      |> Enum.map(&Code.Typespec.spec_to_quoted(name, &1))
 
     specs =
-      if type == :macro do
-        Enum.map(specs, &remove_first_macro_arg/1)
-      else
-        specs
+      case Path.extname(source.path) do
+        ".ex" ->
+          Enum.map(specs, fn spec ->
+            spec = Code.Typespec.spec_to_quoted(name, spec)
+
+            if type == :macro do
+              spec = remove_first_macro_arg(spec)
+            else
+              spec
+            end
+          end)
+
+        ".erl" ->
+          Enum.map(specs, &format_erlang_spec(anno, name, arity, &1))
       end
 
     annotations =
@@ -411,7 +421,15 @@ defmodule ExDoc.Retriever do
           false
       end)
 
-    spec = spec |> Code.Typespec.type_to_quoted() |> process_type_ast(type)
+    spec =
+      case Path.extname(source.path) do
+        ".ex" ->
+          spec |> Code.Typespec.type_to_quoted() |> process_type_ast(type)
+
+        ".erl" ->
+          spec
+      end
+
     line = anno_line(anno) || doc_line
 
     annotations = if type == :opaque, do: ["opaque" | annotations], else: annotations
@@ -421,7 +439,7 @@ defmodule ExDoc.Retriever do
       name: name,
       arity: arity,
       type: type,
-      spec: spec,
+      spec: format_erlang_type(anno, name, arity, spec),
       deprecated: metadata[:deprecated],
       doc: docstring(doc),
       doc_line: doc_line,
@@ -529,10 +547,10 @@ defmodule ExDoc.Retriever do
   end
 
   defp source_path(module, config) do
-    source = String.Chars.to_string(module.__info__(:compile)[:source])
+    source = String.Chars.to_string(module.module_info(:compile)[:source])
 
     if root = config.source_root do
-      Path.relative_to(source, root)
+      Path.relative_to(source, Path.expand(root))
     else
       source
     end
@@ -560,5 +578,57 @@ defmodule ExDoc.Retriever do
     name
     |> String.split(".")
     |> Enum.map_join(".", &Macro.underscore/1)
+  end
+
+  defp format_elixir_type(type, spec) do
+    spec
+    |> Code.Typespec.type_to_quoted()
+    |> process_type_ast(type)
+    |> format_quoted()
+  end
+
+  defp format_elixir_spec(type, name, spec) do
+    quoted = Code.Typespec.spec_to_quoted(name, spec)
+    quoted = if type == :macro, do: remove_first_macro_arg(quoted), else: quoted
+    format_quoted(quoted)
+  end
+
+  defp format_quoted(quoted) do
+    quoted
+    |> Macro.to_string()
+    |> Code.format_string!(line_length: 80)
+    |> IO.iodata_to_binary()
+  end
+
+  defp format_erlang_type(anno, name, arity, spec) do
+    # # TODO: get original `attribute` entry instead!
+    {:attribute, anno, :type, spec}
+    |> :erl_pp.attribute()
+    |> List.to_string()
+    |> fixup()
+  end
+
+  defp format_erlang_spec(anno, name, arity, spec) do
+    # TODO: get original `attribute` entry instead!
+    {:attribute, anno, :spec, {{name, arity}, [spec]}}
+    |> :erl_pp.attribute()
+    |> List.to_string()
+    |> fixup()
+  end
+
+  defp fixup(code) do
+    code
+    |> String.split("\n")
+    |> Enum.map(&fixup_line/1)
+    |> Enum.join("\n")
+    |> String.trim_trailing(".")
+  end
+
+  defp fixup_line(line) do
+    line
+    |> String.replace(~r/\t/, "        ")
+    |> String.replace(~r/^-type /, "")
+    |> String.replace(~r/^-spec /, "")
+    |> String.replace(~r/^      /, "")
   end
 end
