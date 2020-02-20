@@ -30,7 +30,7 @@ defmodule ExDoc.Mixfile do
       {:earmark, "~> 1.3.3 or ~> 1.4"},
       {:makeup_elixir, "~> 0.14"},
       {:makeup_erlang, "~> 0.1.0"},
-      {:cmark, "~> 0.5", only: :test},
+      # {:cmark, "~> 0.5", only: :test},
       {:excoveralls, "~> 0.3", only: :test}
     ]
   end
