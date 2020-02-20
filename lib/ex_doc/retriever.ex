@@ -90,6 +90,20 @@ defmodule ExDoc.Retriever do
         _ = Code.ensure_loaded(module)
         docs
 
+      {:error, :chunk_not_found} ->
+        case :code.which(module) do
+          path when is_list(path) ->
+            chunk_path = Path.join([path |> Path.dirname() |> Path.dirname(), "doc", "chunks", "#{module}.chunk"])
+
+            case File.read(chunk_path) do
+              {:ok, bin} when module == :array ->
+                :erlang.binary_to_term(bin)
+
+              _ ->
+                false
+            end
+        end
+
       {:error, reason} ->
         cond do
           not Code.ensure_loaded?(module) ->
