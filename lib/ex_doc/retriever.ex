@@ -96,7 +96,7 @@ defmodule ExDoc.Retriever do
             chunk_path = Path.join([path |> Path.dirname() |> Path.dirname(), "doc", "chunks", "#{module}.chunk"])
 
             case File.read(chunk_path) do
-              {:ok, bin} when module == :array ->
+              {:ok, bin} ->
                 :erlang.binary_to_term(bin)
 
               _ ->
@@ -205,8 +205,8 @@ defmodule ExDoc.Retriever do
     end
   end
 
-  defp get_module_docs(%{docs: {:docs_v1, anno, _, _, moduledoc, metadata, _}}) do
-    {anno_line(anno), docstring(moduledoc), metadata}
+  defp get_module_docs(%{docs: {:docs_v1, anno, _language, content_type, moduledoc, metadata, _}}) do
+    {anno_line(anno), {content_type, docstring(moduledoc)}, metadata}
   end
 
   defp get_abstract_code(module) do
@@ -221,7 +221,7 @@ defmodule ExDoc.Retriever do
   ## Function helpers
 
   defp get_docs(%{type: type, docs: docs} = module_data, source, config) do
-    {:docs_v1, _, _, _, _, _, docs} = docs
+    {:docs_v1, _, _, content_type, _, _, docs} = docs
 
     groups_for_functions =
       Enum.map(config.groups_for_functions, fn {group, filter} ->
@@ -230,7 +230,7 @@ defmodule ExDoc.Retriever do
 
     function_docs =
       for doc <- docs, doc?(doc, type) do
-        get_function(doc, source, module_data, groups_for_functions)
+        get_function(content_type, doc, source, module_data, groups_for_functions)
       end
 
     {Enum.map(groups_for_functions, &elem(&1, 0)), function_docs}
@@ -261,7 +261,7 @@ defmodule ExDoc.Retriever do
     true
   end
 
-  defp get_function(function, source, module_data, groups_for_functions) do
+  defp get_function(content_type, function, source, module_data, groups_for_functions) do
     {{type, name, arity}, anno, signature, doc, metadata} = function
     actual_def = actual_def(name, arity, type)
     doc_line = anno_line(anno)
@@ -310,7 +310,7 @@ defmodule ExDoc.Retriever do
       name: name,
       arity: arity,
       deprecated: metadata[:deprecated],
-      doc: doc || delegate_doc(metadata[:delegate_to]),
+      doc: (doc && {content_type, doc}) || delegate_doc(metadata[:delegate_to]),
       doc_line: doc_line,
       defaults: defaults,
       signature: Enum.join(signature, " "),
@@ -341,17 +341,17 @@ defmodule ExDoc.Retriever do
   ## Callback helpers
 
   defp get_callbacks(%{type: :behaviour, name: name, abst_code: abst_code, docs: docs}, source) do
-    {:docs_v1, _, _, _, _, _, docs} = docs
+    {:docs_v1, _, _, content_type, _, _, docs} = docs
     optional_callbacks = name.behaviour_info(:optional_callbacks)
 
     for {{kind, _, _}, _, _, _, _} = doc <- docs, kind in [:callback, :macrocallback] do
-      get_callback(doc, source, optional_callbacks, abst_code)
+      get_callback(content_type, doc, source, optional_callbacks, abst_code)
     end
   end
 
   defp get_callbacks(_, _), do: []
 
-  defp get_callback(callback, source, optional_callbacks, abst_code) do
+  defp get_callback(content_type, callback, source, optional_callbacks, abst_code) do
     {{kind, name, arity}, anno, _, doc, metadata} = callback
     actual_def = actual_def(name, arity, kind)
     doc_line = anno_line(anno)
@@ -371,7 +371,7 @@ defmodule ExDoc.Retriever do
       name: name,
       arity: arity,
       deprecated: metadata[:deprecated],
-      doc: docstring(doc),
+      doc: {content_type, docstring(doc)},
       doc_line: doc_line,
       signature: get_typespec_signature(hd(specs), arity),
       specs: specs,
@@ -414,14 +414,14 @@ defmodule ExDoc.Retriever do
   end
 
   defp get_types(%{docs: docs} = module_data, source) do
-    {:docs_v1, _, _, _, _, _, docs} = docs
+    {:docs_v1, _, _, content_type, _, _, docs} = docs
 
     for {{:type, _, _}, _, _, content, _} = doc <- docs, content != :hidden do
-      get_type(doc, source, module_data.abst_code)
+      get_type(content_type, doc, source, module_data.abst_code)
     end
   end
 
-  defp get_type(type, source, abst_code) do
+  defp get_type(content_type, type, source, abst_code) do
     {{_, name, arity}, anno, _, doc, metadata} = type
     doc_line = anno_line(anno)
     annotations = annotations_from_metadata(metadata)
@@ -463,7 +463,7 @@ defmodule ExDoc.Retriever do
       type: type,
       spec: format_erlang_type(anno, name, arity, spec),
       deprecated: metadata[:deprecated],
-      doc: docstring(doc),
+      doc: {content_type, docstring(doc)},
       doc_line: doc_line,
       signature: signature,
       source_path: source.path,

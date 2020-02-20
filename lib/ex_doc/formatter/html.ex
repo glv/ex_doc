@@ -67,6 +67,24 @@ defmodule ExDoc.Formatter.HTML do
   Autolinks and renders all docs.
   """
   def autolink_and_render(project_nodes, ext, config, opts) do
+    project_nodes =
+      for node <- project_nodes do
+        docs =
+          for node <- node.docs do
+            {content_type, doc} = node.doc
+            %{node | doc: to_markdown(content_type, doc)}
+          end
+
+        typespecs =
+          for node <- node.typespecs do
+            {content_type, doc} = node.doc
+            %{node | doc: to_markdown(content_type, doc)}
+          end
+
+        {content_type, doc} = node.doc
+        %{node | doc: to_markdown(content_type, doc), docs: docs, typespecs: typespecs}
+      end
+
     autolink = Autolink.compile(project_nodes, ext, config)
 
     rendered =
@@ -79,6 +97,27 @@ defmodule ExDoc.Formatter.HTML do
       end)
 
     {rendered, autolink}
+  end
+
+  defp to_markdown("text/markdown", text) do
+    text
+  end
+
+  defp to_markdown("application/erlang+html", binary) do
+    binary |> :erlang.binary_to_term() |> to_markdown()
+  end
+
+  defp to_markdown(list) when is_list(list), do: Enum.map_join(list, "", &to_markdown/1)
+  defp to_markdown(binary) when is_binary(binary), do: binary
+  defp to_markdown({:p, _, list}), do: "\n#{to_markdown(list)}\n"
+  defp to_markdown({:anno, _, list}), do: to_markdown(list)
+  # defp to_markdown({:c, _, list}), do: "<code class=inline>#{to_markdown(list)}</code>"
+  # defp to_markdown({:pre, _, list}), do: "<code>#{to_markdown(list)}</code>"
+  defp to_markdown({:c, _, list}), do: "`#{to_markdown(list)}`"
+  defp to_markdown({:pre, _, list}), do: "\n```\n#{to_markdown(list)}\n```\n"
+  defp to_markdown({tag, attributes, list}) do
+    attributes = Enum.map_join(attributes, " ", fn {key, val} -> ~s{#{key}="#{val}"} end)
+    "<#{tag} #{attributes}>#{to_markdown(list)}</#{tag}>"
   end
 
   defp render_doc(%{doc: nil} = node, _opts),
@@ -240,6 +279,8 @@ defmodule ExDoc.Formatter.HTML do
   end
 
   defp build_extra(input, id, title, autolink, groups) do
+    raise "oops"
+
     if valid_extension_name?(input) do
       content =
         input
