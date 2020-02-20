@@ -283,7 +283,7 @@ defmodule ExDoc.Retriever do
             spec = Code.Typespec.spec_to_quoted(name, spec)
 
             if type == :macro do
-              spec = remove_first_macro_arg(spec)
+              remove_first_macro_arg(spec)
             else
               spec
             end
@@ -448,6 +448,14 @@ defmodule ExDoc.Retriever do
 
     annotations = if type == :opaque, do: ["opaque" | annotations], else: annotations
 
+    signature =
+      try do
+        get_typespec_signature(spec, arity)
+      rescue
+        _ ->
+          "(bad signature)"
+      end
+
     %ExDoc.TypeNode{
       id: "#{name}/#{arity}",
       name: name,
@@ -457,7 +465,7 @@ defmodule ExDoc.Retriever do
       deprecated: metadata[:deprecated],
       doc: docstring(doc),
       doc_line: doc_line,
-      signature: get_typespec_signature(spec, arity),
+      signature: signature,
       source_path: source.path,
       source_url: source_link(source, line),
       annotations: annotations
@@ -594,27 +602,27 @@ defmodule ExDoc.Retriever do
     |> Enum.map_join(".", &Macro.underscore/1)
   end
 
-  defp format_elixir_type(type, spec) do
-    spec
-    |> Code.Typespec.type_to_quoted()
-    |> process_type_ast(type)
-    |> format_quoted()
-  end
+  # defp format_elixir_type(type, spec) do
+  #   spec
+  #   |> Code.Typespec.type_to_quoted()
+  #   |> process_type_ast(type)
+  #   |> format_quoted()
+  # end
 
-  defp format_elixir_spec(type, name, spec) do
-    quoted = Code.Typespec.spec_to_quoted(name, spec)
-    quoted = if type == :macro, do: remove_first_macro_arg(quoted), else: quoted
-    format_quoted(quoted)
-  end
+  # defp format_elixir_spec(type, name, spec) do
+  #   quoted = Code.Typespec.spec_to_quoted(name, spec)
+  #   quoted = if type == :macro, do: remove_first_macro_arg(quoted), else: quoted
+  #   format_quoted(quoted)
+  # end
 
-  defp format_quoted(quoted) do
-    quoted
-    |> Macro.to_string()
-    |> Code.format_string!(line_length: 80)
-    |> IO.iodata_to_binary()
-  end
+  # defp format_quoted(quoted) do
+  #   quoted
+  #   |> Macro.to_string()
+  #   |> Code.format_string!(line_length: 80)
+  #   |> IO.iodata_to_binary()
+  # end
 
-  defp format_erlang_type(anno, name, arity, spec) do
+  defp format_erlang_type(anno, _name, _arity, spec) do
     # # TODO: get original `attribute` entry instead!
     {:attribute, anno, :type, spec}
     |> :erl_pp.attribute()
