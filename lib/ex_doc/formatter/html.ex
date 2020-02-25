@@ -104,7 +104,7 @@ defmodule ExDoc.Formatter.HTML do
   end
 
   defp to_markdown("application/erlang+html", binary) do
-    binary |> :erlang.binary_to_term() |> to_markdown()
+    to_markdown(binary)
   end
 
   defp to_markdown(list) when is_list(list), do: Enum.map_join(list, "", &to_markdown/1)
@@ -116,8 +116,8 @@ defmodule ExDoc.Formatter.HTML do
   defp to_markdown({:c, _, list}), do: "`#{to_markdown(list)}`"
   defp to_markdown({:pre, _, list}), do: "\n```\n#{to_markdown(list)}\n```\n"
   defp to_markdown({tag, attributes, list}) do
-    attributes = Enum.map_join(attributes, " ", fn {key, val} -> ~s{#{key}="#{val}"} end)
-    "<#{tag} #{attributes}>#{to_markdown(list)}</#{tag}>"
+    attributes = Enum.map_join(attributes, "", fn {key, val} -> ~s{ #{key}="#{val}"} end)
+    "<#{tag}#{attributes}>#{to_markdown(list)}</#{tag}>"
   end
 
   defp render_doc(%{doc: nil} = node, _opts),
