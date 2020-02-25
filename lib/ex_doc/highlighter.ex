@@ -4,7 +4,7 @@ defmodule ExDoc.Highlighter do
   """
 
   # If new lexers are available, add them here:
-  defp pick_language_and_lexer(""), do: {"erlang", Makeup.Lexers.ErlangLexer, []}
+  defp pick_language_and_lexer(""), do: {"elixir", Makeup.Lexers.ElixirLexer, []}
 
   defp pick_language_and_lexer(lang) do
     case Makeup.Registry.fetch_lexer_by_name(lang) do

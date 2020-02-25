@@ -43,9 +43,7 @@ defmodule ExDoc.Markdown do
   Converts the given markdown document to HTML.
   """
   def to_html(text, opts \\ []) when is_binary(text) do
-    _ = opts
-    text
-    # get_markdown_processor().to_html(text, opts)
+    get_markdown_processor().to_html(text, opts)
   end
 
   @doc """

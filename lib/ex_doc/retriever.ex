@@ -93,16 +93,10 @@ defmodule ExDoc.Retriever do
       {:error, :chunk_not_found} ->
         case :code.which(module) do
           path when is_list(path) ->
-            chunk_path =
-              Path.join([
-                path |> Path.dirname() |> Path.dirname(),
-                "doc",
-                "chunks",
-                "#{module}.chunk"
-              ])
+            chunk_path = Path.join([path |> Path.dirname() |> Path.dirname(), "doc", "chunks", "#{module}.chunk"])
 
             case File.read(chunk_path) do
-              {:ok, bin} when module == :array ->
+              {:ok, bin} ->
                 :erlang.binary_to_term(bin)
 
               _ ->
@@ -146,7 +140,7 @@ defmodule ExDoc.Retriever do
     source_path = source_path(module, config)
     source = %{url: source_url, path: source_path}
 
-    {doc_line, {content_type, moduledoc}, metadata} = get_module_docs(module_data)
+    {doc_line, moduledoc, metadata} = get_module_docs(module_data)
     line = find_module_line(module_data) || doc_line
 
     {function_groups, function_docs} = get_docs(module_data, source, config)
@@ -168,7 +162,6 @@ defmodule ExDoc.Retriever do
       function_groups: function_groups,
       docs: Enum.sort_by(docs, &{&1.name, &1.arity}),
       doc: moduledoc,
-      doc_content_type: content_type,
       doc_line: doc_line,
       typespecs: Enum.sort_by(types, &{&1.name, &1.arity}),
       source_path: source_path,
@@ -317,8 +310,7 @@ defmodule ExDoc.Retriever do
       name: name,
       arity: arity,
       deprecated: metadata[:deprecated],
-      doc: doc || delegate_doc(metadata[:delegate_to]),
-      doc_content_type: content_type,
+      doc: (doc && {content_type, doc}) || delegate_doc(metadata[:delegate_to]),
       doc_line: doc_line,
       defaults: defaults,
       signature: Enum.join(signature, " "),
@@ -471,8 +463,7 @@ defmodule ExDoc.Retriever do
       type: type,
       spec: format_erlang_type(anno, name, arity, spec),
       deprecated: metadata[:deprecated],
-      doc: docstring(doc),
-      doc_content_type: content_type,
+      doc: {content_type, docstring(doc)},
       doc_line: doc_line,
       signature: signature,
       source_path: source.path,
