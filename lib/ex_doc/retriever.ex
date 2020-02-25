@@ -76,13 +76,7 @@ defmodule ExDoc.Retriever do
   defp docs_chunk(:elixir_bootstrap), do: false
 
   defp docs_chunk(module) do
-    unless function_exported?(Code, :fetch_docs, 1) do
-      raise Error,
-            "ExDoc 0.19+ requires Elixir v1.7 and later. " <>
-              "For earlier Elixir versions, make sure to depend on {:ex_doc, \"~> 0.18.0\"}"
-    end
-
-    case Code.fetch_docs(module) do
+    case fetch_docs(module) do
       {:docs_v1, _, _, _, :hidden, _, _} ->
         false
 
@@ -124,6 +118,69 @@ defmodule ExDoc.Retriever do
               "unknown format in Docs chunk. This likely means you are running on " <>
                 "a more recent Elixir version that is not supported by ExDoc. Please update."
     end
+  end
+
+  # TODO: this is vendored from Elixir v1.11.0.
+  #       Remove and use Code.fetch_docs/1 in the future.
+  defp fetch_docs(module) when is_atom(module) do
+    case :code.get_object_code(module) do
+      {_module, bin, beam_path} ->
+        case fetch_docs_from_beam(bin) do
+          {:error, :chunk_not_found} ->
+            app_root = Path.expand(Path.join(["..", ".."]), beam_path)
+            path = Path.join([app_root, "doc", "chunks", "#{module}.chunk"])
+            fetch_docs_from_chunk(path)
+
+          other ->
+            other
+        end
+
+      :error ->
+        case :code.which(module) do
+          :preloaded ->
+            path = Path.join([:code.lib_dir(:erts), "doc", "chunks", "#{module}.chunk"])
+            fetch_docs_from_chunk(path)
+
+          _ ->
+            {:error, :module_not_found}
+        end
+    end
+  end
+
+  defp fetch_docs(path) when is_binary(path) do
+    fetch_docs_from_beam(String.to_charlist(path))
+  end
+
+  @docs_chunk 'Docs'
+
+  defp fetch_docs_from_beam(bin_or_path) do
+    case :beam_lib.chunks(bin_or_path, [@docs_chunk]) do
+      {:ok, {_module, [{@docs_chunk, bin}]}} ->
+        load_docs_chunk(bin)
+
+      {:error, :beam_lib, {:missing_chunk, _, @docs_chunk}} ->
+        {:error, :chunk_not_found}
+
+      {:error, :beam_lib, {:file_error, _, :enoent}} ->
+        {:error, :module_not_found}
+    end
+  end
+
+  defp fetch_docs_from_chunk(path) do
+    case File.read(path) do
+      {:ok, bin} ->
+        load_docs_chunk(bin)
+
+      {:error, _} ->
+        {:error, :chunk_not_found}
+    end
+  end
+
+  defp load_docs_chunk(bin) do
+    :erlang.binary_to_term(bin)
+  rescue
+    _ ->
+      {:error, {:invalid_chunk, bin}}
   end
 
   defp generate_node(module, docs_chunk, config) do
