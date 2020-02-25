@@ -109,12 +109,9 @@ defmodule ExDoc.Formatter.HTML do
 
   defp to_markdown(list) when is_list(list), do: Enum.map_join(list, "", &to_markdown/1)
   defp to_markdown(binary) when is_binary(binary), do: binary
-  defp to_markdown({:p, _, list}), do: "\n#{to_markdown(list)}\n"
-  defp to_markdown({:anno, _, list}), do: to_markdown(list)
-  # defp to_markdown({:c, _, list}), do: "<code class=inline>#{to_markdown(list)}</code>"
-  # defp to_markdown({:pre, _, list}), do: "<code>#{to_markdown(list)}</code>"
-  defp to_markdown({:c, _, list}), do: "`#{to_markdown(list)}`"
-  defp to_markdown({:pre, _, list}), do: "\n```\n#{to_markdown(list)}\n```\n"
+  defp to_markdown({:p, _, contents}), do: "\n#{to_markdown(contents)}\n"
+  defp to_markdown({:pre, _, [{:code, _, contents}]}), do: "\n```\n#{to_markdown(contents)}\n```\n"
+  defp to_markdown({:code, _, contents}), do: "`#{to_markdown(contents)}`"
   defp to_markdown({tag, attributes, list}) do
     attributes = Enum.map_join(attributes, "", fn {key, val} -> ~s{ #{key}="#{val}"} end)
     "<#{tag}#{attributes}>#{to_markdown(list)}</#{tag}>"
