@@ -71,18 +71,15 @@ defmodule ExDoc.Formatter.HTML do
       for node <- project_nodes do
         docs =
           for node <- node.docs do
-            {content_type, doc} = node.doc
-            %{node | doc: to_markdown(content_type, doc)}
+            %{node | doc: to_html(node.doc_content_type, node.doc)}
           end
 
         typespecs =
           for node <- node.typespecs do
-            {content_type, doc} = node.doc
-            %{node | doc: to_markdown(content_type, doc)}
+            %{node | doc: to_html(node.doc_content_type, node.doc)}
           end
 
-        {content_type, doc} = node.doc
-        %{node | doc: to_markdown(content_type, doc), docs: docs, typespecs: typespecs}
+        %{node | doc: to_html(node.doc_content_type, node.doc), docs: docs, typespecs: typespecs}
       end
 
     autolink = Autolink.compile(project_nodes, ext, config)
@@ -99,32 +96,44 @@ defmodule ExDoc.Formatter.HTML do
     {rendered, autolink}
   end
 
-  defp to_markdown("text/markdown", text) do
+  defp to_html("text/markdown", text) do
     text
   end
 
-  defp to_markdown("application/erlang+html", binary) do
-    binary |> :erlang.binary_to_term() |> to_markdown()
+  defp to_html("application/erlang+html", binary) do
+    binary
+    |> :erlang.binary_to_term()
+    |> normalize()
+    |> to_html()
   end
 
-  defp to_markdown(list) when is_list(list), do: Enum.map_join(list, "", &to_markdown/1)
-  defp to_markdown(binary) when is_binary(binary), do: binary
-  defp to_markdown({:p, _, list}), do: "\n#{to_markdown(list)}\n"
-  defp to_markdown({:anno, _, list}), do: to_markdown(list)
-  # defp to_markdown({:c, _, list}), do: "<code class=inline>#{to_markdown(list)}</code>"
-  # defp to_markdown({:pre, _, list}), do: "<code>#{to_markdown(list)}</code>"
-  defp to_markdown({:c, _, list}), do: "`#{to_markdown(list)}`"
-  defp to_markdown({:pre, _, list}), do: "\n```\n#{to_markdown(list)}\n```\n"
-  defp to_markdown({tag, attributes, list}) do
-    attributes = Enum.map_join(attributes, " ", fn {key, val} -> ~s{#{key}="#{val}"} end)
-    "<#{tag} #{attributes}>#{to_markdown(list)}</#{tag}>"
+  defp normalize(ast) do
+    Macro.prewalk(ast, fn
+      {:a, [marker: href], contents} ->
+        {:a, [href: href], contents}
+
+      other ->
+        other
+    end)
+  end
+
+  defp to_html(list) when is_list(list), do: Enum.map_join(list, "", &to_html/1)
+  defp to_html(binary) when is_binary(binary), do: binary
+  defp to_html({tag, attributes, list}) do
+    attributes = Enum.map_join(attributes, "", fn {key, val} -> ~s{ #{key}="#{val}"} end)
+    "<#{tag}#{attributes}>#{to_html(list)}</#{tag}>"
   end
 
   defp render_doc(%{doc: nil} = node, _opts),
     do: node
 
   defp render_doc(%{doc: doc, source_path: file, doc_line: line} = node, opts),
-    do: %{node | rendered_doc: ExDoc.Markdown.to_html(doc, [file: file, line: line + 1] ++ opts)}
+    do: %{node | rendered_doc: do_render_doc(doc, [file: file, line: line + 1] ++ opts)}
+
+  defp do_render_doc(doc, opts) do
+    doc
+    |> ExDoc.Highlighter.highlight_code_blocks(opts)
+  end
 
   defp output_setup(build, config) do
     if File.exists?(build) do
