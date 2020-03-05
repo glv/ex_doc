@@ -83,7 +83,24 @@ defmodule ExDoc.Formatter.HTML do
     do: node
 
   defp render_doc(%{doc: doc, source_path: file, doc_line: line} = node, opts),
-    do: %{node | rendered_doc: ExDoc.Markdown.to_html(doc, [file: file, line: line + 1] ++ opts)}
+    do: %{node | rendered_doc: to_html(doc, [file: file, line: line + 1] ++ opts)}
+
+  defp to_html(doc, opts) do
+    doc
+    |> Markdown.to_ast(opts)
+    |> ast_to_html()
+    |> IO.iodata_to_binary()
+    |> ExDoc.Highlighter.highlight_code_blocks(opts)
+  end
+
+  defp ast_to_html(list) when is_list(list), do: Enum.map(list, &ast_to_html/1)
+  defp ast_to_html(binary) when is_binary(binary), do: binary
+
+  defp ast_to_html({tag, attrs, ast}) do
+    attrs = Enum.map(attrs, fn {key, val} -> " #{key}=\"#{val}\"" end)
+    ["<#{tag}", attrs, ">", ast_to_html(ast), "</#{tag}>"]
+    ["<#{tag}#{attrs}>", ast_to_html(ast), "</#{tag}>"]
+  end
 
   defp output_setup(build, config) do
     if File.exists?(build) do
@@ -245,7 +262,7 @@ defmodule ExDoc.Formatter.HTML do
         |> Autolink.project_doc(id, autolink)
 
       group = GroupMatcher.match_extra(groups, input)
-      html_content = Markdown.to_html(content, file: input, line: 1)
+      html_content = to_html(content, file: input, line: 1)
 
       title = title || extract_title(html_content) || filename_to_title(input)
       %{id: id, title: title, group: group, content: html_content}
@@ -272,7 +289,7 @@ defmodule ExDoc.Formatter.HTML do
     Regex.replace(@tag_regex, header, "")
   end
 
-  @h1_regex ~r/<h1.*?>(.+)<\/h1>/m
+  @h1_regex ~r/<h1.*?>(.+?)<\/h1>/m
   defp extract_title(content) do
     title = Regex.run(@h1_regex, content, capture: :all_but_first)
 
