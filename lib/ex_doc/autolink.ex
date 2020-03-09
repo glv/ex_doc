@@ -79,12 +79,12 @@ defmodule ExDoc.Autolink do
     end
   end
 
-  defp parse("mix " <> name, _) do
-    if name =~ ~r/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/ do
-      mix_task(name)
-    else
-      :error
-    end
+  defp parse("mix help " <> name, _config) do
+    mix_task(name)
+  end
+
+  defp parse("mix " <> name, _config) do
+    mix_task(name)
   end
 
   defp parse("t:" <> text, mode) do
@@ -147,8 +147,12 @@ defmodule ExDoc.Autolink do
   end
 
   defp mix_task(name) do
-    parts = name |> String.split(".") |> Enum.map(&Macro.camelize/1)
-    {:ok, {:module, Module.concat([Mix, Tasks | parts])}}
+    if name =~ ~r/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/ do
+      parts = name |> String.split(".") |> Enum.map(&Macro.camelize/1)
+      {:ok, {:module, Module.concat([Mix, Tasks | parts])}}
+    else
+      :error
+    end
   end
 
   defp module(module) when is_atom(module), do: module

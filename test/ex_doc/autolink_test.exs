@@ -150,8 +150,16 @@ defmodule ExDoc.AutolinkTest do
       assert autolinked(~t"mix compile.elixir") ==
                "https://hexdocs.pm/mix/Mix.Tasks.Compile.Elixir.html"
 
+      assert autolinked(~t"mix help compile.elixir") ==
+               "https://hexdocs.pm/mix/Mix.Tasks.Compile.Elixir.html"
+
+      assert autolinked(~t"mix help help") ==
+               "https://hexdocs.pm/mix/Mix.Tasks.Help.html"
+
       assert autolinked(~t"mix compile.elixir", app: :mix) ==
                "Mix.Tasks.Compile.Elixir.html"
+
+      assert_unchanged(~t"mix compile.elixir --verbose")
 
       assert_unchanged(~t"mix unknown.task")
     end
