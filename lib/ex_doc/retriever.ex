@@ -160,8 +160,18 @@ defmodule ExDoc.Retriever do
   defp doc_ast(_, nil), do: nil
   defp doc_ast(_, :none), do: nil
   defp doc_ast("text/markdown", %{"en" => doc}), do: Markdown.to_ast(doc)
-  defp doc_ast("text/markdown", doc), do: Markdown.to_ast(doc)
+  defp doc_ast("application/erlang+html", %{"en" => doc}), do: fixup_erlang_html(doc)
   defp doc_ast(other, _), do: raise("content type #{inspect(other)} is not supported")
+
+  # TODO: this is only to convert `{attr_name, attr_value :: charlist}` to `{attr_name, attr_value :: binary}`,
+  # this should be done in OTP instead
+  defp fixup_erlang_html(list) when is_list(list), do: Enum.map(list, &fixup_erlang_html/1)
+  defp fixup_erlang_html(binary) when is_binary(binary), do: binary
+  defp fixup_erlang_html({tag, attrs, ast}) do
+    new_attrs = for {key, val} <- attrs, do: {key, to_string(val)}
+    new_ast = fixup_erlang_html(ast)
+    {tag, new_attrs, new_ast}
+  end
 
   # Module Helpers
 
@@ -544,7 +554,7 @@ defmodule ExDoc.Retriever do
   end
 
   defp source_path(module, config) do
-    source = String.Chars.to_string(module.__info__(:compile)[:source])
+    source = String.Chars.to_string(module.module_info(:compile)[:source])
 
     if root = config.source_root do
       Path.relative_to(source, root)
