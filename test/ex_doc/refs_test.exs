@@ -25,8 +25,9 @@ defmodule ExDoc.RefsTest do
     assert Refs.public?({:function, :lists, :all, 2})
     refute Refs.public?({:function, :lists, :all, 9})
 
-    assert Refs.public?({:callback, :gen_server, :handle_call, 3})
-    assert Refs.public?({:callback, :gen_server, :handle_call, 9}) in [true, false]
+    # TODO: enable when OTP 23.0-rc2 is out (it should have callbacks support)
+    # assert Refs.public?({:callback, :gen_server, :handle_call, 3})
+    # assert Refs.public?({:callback, :gen_server, :handle_call, 9}) in [true, false]
 
     assert Refs.public?({:type, :sets, :set, 0})
     assert Refs.public?({:type, :sets, :set, 9}) in [true, false]
