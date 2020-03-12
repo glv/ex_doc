@@ -167,16 +167,22 @@ defmodule ExDoc.Autolink do
   end
 
   defp postprocess({:a, attrs, ast} = node, config) do
-    case link(attrs[:href], config) do
-      :no_ref ->
-        unwrap(ast)
-
-      :keep ->
+    case attrs[:href] do
+      nil ->
         node
 
-      link ->
-        url = url(link, config)
-        {:a, [href: url], ast}
+      _ ->
+        case link(attrs[:href], config) do
+          :no_ref ->
+            unwrap(ast)
+
+          :keep ->
+            node
+
+          link ->
+            url = url(link, config)
+            {:a, [href: url], ast}
+        end
     end
   end
 
