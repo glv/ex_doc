@@ -31,14 +31,28 @@ defmodule ExDoc.Markdown.Earmark do
       struct(Earmark.Options,
         gfm: Keyword.get(opts, :gfm, true),
         line: Keyword.get(opts, :line, 1),
-        file: Keyword.get(opts, :file),
+        file: Keyword.get(opts, :file, "nofile"),
         breaks: Keyword.get(opts, :breaks, false),
         smartypants: Keyword.get(opts, :smartypants, false),
         pure_links: true
       )
 
-    {:ok, ast, _messages} = Earmark.as_ast(text, options)
-    fixup(ast)
+    case Earmark.as_ast(text, options) do
+      {:ok, ast, messages} ->
+        print_messages(messages, options)
+        fixup(ast)
+
+      {:error, ast, messages} ->
+        print_messages(messages, options)
+        ast
+    end
+  end
+
+  defp print_messages(messages, options) do
+    for {severity, line, message} <- messages do
+      file = options.file
+      IO.warn("#{inspect(__MODULE__)} (#{severity}) #{file}:#{line} #{message}", [])
+    end
   end
 
   defp fixup(list) when is_list(list), do: Enum.map(list, &fixup/1)

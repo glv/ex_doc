@@ -25,7 +25,7 @@ defmodule ExDoc.Markdown do
   @markdown_processor_key :markdown_processor
 
   @doc """
-  Converts the given markdown document to HTML.
+  Converts the given markdown document to HTML AST.
   """
   def to_ast(text, opts \\ []) when is_binary(text) do
     get_markdown_processor().to_ast(text, opts)
